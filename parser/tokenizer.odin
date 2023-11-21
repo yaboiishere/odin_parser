@@ -2,7 +2,6 @@ package parser
 
 import "core:log"
 import "core:os"
-import "core:strings"
 
 SymbolType :: union {
 	String,
@@ -34,11 +33,14 @@ InvalidToken :: struct {
 ReadError :: union {
 	ReadMoreThanOneByte,
 	os.Errno,
+	EOF,
 }
 
 ReadMoreThanOneByte :: struct {
 	total_read: int,
 }
+
+EOF :: struct {}
 
 
 accept :: proc(current_symbol: SymbolType, accepted_symbol: SymbolType) -> bool {
@@ -56,15 +58,8 @@ expect :: proc(current_symbol: SymbolType, expected_symbol: SymbolType) -> (bool
 }
 
 
-getNextChar :: proc(
-	file: ^os.Handle,
-	current_char: []byte,
-	read_offset: ^int,
-) -> (
-	int,
-	ReadError,
-) {
-	total_read, error := os.read_at(file^, current_char, i64(read_offset^))
+getNextChar :: proc(file: ^os.Handle, current_char: ^[]byte) -> (int, ReadError) {
+	total_read, error := os.read(file^, current_char^)
 	if (error != os.ERROR_NONE) {
 		return 0, error
 	}
@@ -73,24 +68,33 @@ getNextChar :: proc(
 		return 0, ReadMoreThanOneByte{total_read = total_read}
 	}
 
-	read_offset^ = read_offset^ + total_read
-
 	return total_read, nil
 }
 
 getNextSymbol :: proc(
 	file: ^os.Handle,
-	current_char: []byte,
-	offset: ^int,
+	current_char: ^[]byte,
 ) -> (
 	symbol: SymbolType,
+	err: ReadError,
 ) {
 	digit := 0
 	k := 0
 	spelling: [10]byte
-	bonus_offset := 0
 
-	char := strings.string_from_ptr(raw_data(current_char), 1)
+	for current_char[0] == ' ' ||
+	    current_char[0] == '\n' ||
+	    current_char[0] == '\t' ||
+	    current_char[0] == 0 {
+		bytes_read := getNextChar(file, current_char) or_return
+		log.debugf("Read %v bytes", bytes_read)
+		if (bytes_read == 0) {
+			return nil, EOF{}
+		}
+	}
+
+	// char := strings.string_from_ptr(current_char[:], 1)
+	char := transmute(string)current_char[:]
 
 	switch current_char[0] {
 	case 'a' ..= 'z', 'A' ..= 'Z':
@@ -100,6 +104,7 @@ getNextSymbol :: proc(
 				spelling[k] = current_char[0]
 				k = k + 1
 			} else {
+
 				break
 			}
 		}
@@ -107,9 +112,36 @@ getNextSymbol :: proc(
 
 	case:
 		symbol = Other{}
-		getNextSymbol(file, current_char, offset)
+
 	}
 
-	log.debug("Found a symbol %v, which was", symbol, char)
-	return symbol
+	log.debugf("Found a symbol %v, which was %v", symbol, char)
+	return symbol, err
+}
+
+readFromFileWhile :: proc(
+	file: os.Handle,
+	buffer: []byte,
+	aceptable_symbols: ..SymbolType,
+) -> false {
+	for {
+		symbol, err := getNextSymbol(file, buffer)
+		if (err != nil) {
+			log.errorf("Error reading from file: %v", err)
+			return
+		}
+
+		if (symbol == nil) {
+			log.debug("Reached EOF")
+			return
+		}
+
+		if (symbol in aceptable_symbols) {
+			log.debugf("Found a symbol %v", symbol)
+			continue
+		}
+
+		log.debugf("Found an unacceptable symbol %v", symbol)
+		return
+	}
 }

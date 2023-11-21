@@ -27,38 +27,28 @@ main :: proc() {
 	}
 	defer os.close(input_file)
 
-	current_char: [1]byte
+	current_char: []byte = {0}
 	file_read_error: ReadError = os.ERROR_NONE
-	read_offset: int = 0
 
-	// for file_read_error == os.ERROR_NONE && current_char[0] != 10 {
-	// 	amount_read, read_error := getNextChar(input_file, current_char[:], read_offset)
-	// 	if read_error != nil {
-	// 		log.errorf("Error reading input file: %v\n", read_error)
-	// 		file_read_error = read_error
-	// 	}
-	// 	if amount_read == 0 {
-	// 		break
-	// 	}
-	// 	read_offset = read_offset + amount_read
-	// 	// as_string := strings.string_from_ptr(raw_data(current_char[:]), amount_read)
-	// 	fmt.printf("char: %v, total_read: %v\n", current_char, amount_read)
-	// }
+	symbols: [256]SymbolType
+	symbols_count: int = 0
+
 	for file_read_error == os.ERROR_NONE {
-		amount_read, read_error := getNextSymbol()(&input_file, current_char[:], &read_offset)
+		symbol, read_error := getNextSymbol(&input_file, &current_char)
+		_, is_eof_error := read_error.(EOF)
+		if is_eof_error {
+			break
+		}
 		if read_error != nil {
 			log.errorf("Error reading input file: %v\n", read_error)
 			file_read_error = read_error
 		}
 
-		if amount_read == 0 {
-			break
-		}
-
-		if current_char[0] == '\n' || current_char[0] == '\r' || current_char[0] == ' ' {
-			continue
-		}
-		read_offset = read_offset + amount_read
+		symbols[symbols_count] = symbol
+		symbols_count = symbols_count + 1
+		getNextChar(&input_file, &current_char)
 
 	}
+
+	log.debugf("Symbols: %v\n", symbols[:symbols_count])
 }
