@@ -14,22 +14,24 @@ Token :: union {
 	EOF,
 	Text,
 	IntConst,
+	QuotedString,
 	Semicolon,
 	Period,
 	Quote,
-	Identifier,
+	Slash,
+	Colon,
 }
 
 Text :: struct {
 	value: string,
 }
 
-IntConst :: struct {
-	value: int,
+QuotedString :: struct {
+	value: string,
 }
 
-Identifier :: struct {
-	value: string,
+IntConst :: struct {
+	value: int,
 }
 
 Semicolon :: struct {}
@@ -39,6 +41,10 @@ Period :: struct {}
 Quote :: struct {}
 
 EOF :: struct {}
+
+Slash :: struct {}
+
+Colon :: struct {}
 
 /*
 A mutable structure that keeps track of and allows operations for looking at,
@@ -128,6 +134,34 @@ tokenizer_expect_exact :: proc(
 	}
 
 	return read_token, nil
+}
+
+tokenizer_expect_exact_one_of :: proc(
+	tokenizer: ^Tokenizer,
+	expectations: []Token,
+) -> (
+	token: SourceToken,
+	error: Maybe(ExpectedOneOf),
+) {
+	start_location := Location {
+		position = tokenizer.position,
+		line     = tokenizer.line,
+		column   = tokenizer.column,
+	}
+	read_token, _, _ := tokenizer_next_token(tokenizer)
+
+	for expectation in expectations {
+		if read_token.token == expectation {
+			return read_token, nil
+		}
+	}
+
+	return SourceToken{},
+		ExpectedOneOf {
+			expected = expectations,
+			actual = read_token.token,
+			location = start_location,
+		}
 }
 
 tokenizer_expect :: proc(
@@ -339,6 +373,16 @@ current :: proc(tokenizer: ^Tokenizer, modify: bool) -> (token: Token) {
 		tokenizer_copy.column += 1
 
 		return Semicolon{}
+	case '/':
+		tokenizer_copy.position += 1
+		tokenizer_copy.column += 1
+
+		return Slash{}
+	case ':':
+		tokenizer_copy.position += 1
+		tokenizer_copy.column += 1
+
+		return Colon{}
 	case '0' ..= '9':
 		return read_integer(&tokenizer_copy)
 	case '"':
@@ -366,12 +410,12 @@ read_identifier :: proc(tokenizer: ^Tokenizer) -> (token: Token) {
 
 	assert(source[0] >= 'a' && source[0] <= 'z')
 
-	symbol_value := read_until(source, " \t\n()[]{}<>,.:'\"")
+	symbol_value := read_until(source, " \t\n()[]{}<>,.:'\"/")
 	symbol_length := len(symbol_value)
 	tokenizer.position += symbol_length
 	tokenizer.column += symbol_length
 
-	return Identifier{value = symbol_value}
+	return Text{value = symbol_value}
 }
 
 @(private = "file")
@@ -431,5 +475,5 @@ read_string :: proc(tokenizer: ^Tokenizer, quote_characters: string) -> (token: 
 		tokenizer.column = end_quote_index - last_newline_index
 	}
 
-	return Text{value = string_contents}
+	return QuotedString{value = string_contents}
 }
