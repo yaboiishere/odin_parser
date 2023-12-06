@@ -1,6 +1,6 @@
 package parser
 
-import "core:strings"
+import "core:fmt"
 
 ParseUrlError :: union {
 	InvalidProtocol,
@@ -24,9 +24,12 @@ Url :: struct {
 	path:     string,
 }
 
-parse_url :: proc(parse_url_arguments: ParseUrl) -> (url: Url, error: ParseUrlError) {
+parse_url_cli :: proc(parse_url_arguments: ParseUrl) -> (url: Url, error: ParseUrlError) {
 	raw_url := parse_url_arguments.url
+	return parse_url(raw_url)
+}
 
+parse_url :: proc(raw_url: string) -> (url: Url, error: ParseUrlError) {
 	tokenizer := tokenizer_create(raw_url, "url")
 
 	protocol_token, protocol_error := tokenizer_expect_exact_one_of(
@@ -55,7 +58,7 @@ parse_url :: proc(parse_url_arguments: ParseUrl) -> (url: Url, error: ParseUrlEr
 
 	url.host = host.value
 
-	colon_token, _ := tokenizer_expect(&tokenizer, Colon{})
+	colon_token, _ := tokenizer_expect_one_of(&tokenizer, {Colon{}, Slash{}})
 	_, is_colon := colon_token.token.(Colon)
 
 	if is_colon {
@@ -72,16 +75,12 @@ parse_url :: proc(parse_url_arguments: ParseUrl) -> (url: Url, error: ParseUrlEr
 		url.port = 80
 	}
 
-	tokenizer_expect(&tokenizer, Slash{})
-
-
 	path_token, _ := tokenizer_expect(&tokenizer, Text{})
 	path, path_is_text := path_token.token.(Text)
 
 	if path_is_text {
 		url.path = path.value
 	}
-
 
 	return url, nil
 }

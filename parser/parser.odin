@@ -10,6 +10,8 @@ import "../dependencies/cli"
 Command :: union {
 	ParseFile,
 	ParseUrl,
+	DNSLookup,
+	Get,
 }
 
 ParseFile :: struct {
@@ -20,6 +22,13 @@ ParseUrl :: struct {
 	url: string `cli:"u,url/required"`,
 }
 
+DNSLookup :: struct {
+	hostname: string `cli:"h,hostname/required"`,
+}
+
+Get :: struct {
+	url: string `cli:"u,url/required"`,
+}
 
 main :: proc() {
 	arena: virtual.Arena
@@ -46,12 +55,31 @@ main :: proc() {
 	case ParseFile:
 		parse_file(c)
 	case ParseUrl:
-		url, url_error := parse_url(c)
+		url, url_error := parse_url_cli(c)
 		if url_error != nil {
 			fmt.println("Failed to parse url: ", url_error)
 			os.exit(1)
 		}
 
 		fmt.println("url: ", url)
+
+	case DNSLookup:
+		ipv4, ipv4Error := dnsLookup(c)
+
+		if ipv4Error != nil {
+			fmt.println("Failed to lookup dns: ", ipv4Error)
+			os.exit(1)
+		}
+
+		fmt.println("ipv4: ", ipv4)
+
+	case Get:
+		resp, err := get(c.url)
+		if err != nil {
+			fmt.println("Failed to get url: ", err)
+			os.exit(1)
+		}
+
+		fmt.println("resp: ", resp)
 	}
 }

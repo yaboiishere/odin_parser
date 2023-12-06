@@ -1,5 +1,6 @@
 package parser
 
+import "core:fmt"
 import "core:log"
 import "core:reflect"
 import "core:strconv"
@@ -389,6 +390,8 @@ current :: proc(tokenizer: ^Tokenizer, modify: bool) -> (token: Token) {
 		return read_string(&tokenizer_copy, `"`)
 	case 'a' ..= 'z':
 		return read_identifier(&tokenizer_copy)
+	case 'A' ..= 'Z':
+		return read_identifier(&tokenizer_copy)
 	case:
 		log.panicf(
 			"Unexpected character '%c' @ %s:%d:%d (snippet: '%s')",
@@ -408,9 +411,9 @@ read_identifier :: proc(tokenizer: ^Tokenizer) -> (token: Token) {
 	start := tokenizer.position
 	source := tokenizer.source[start:]
 
-	assert(source[0] >= 'a' && source[0] <= 'z')
+	assert((source[0] >= 'a' && source[0] <= 'z') || (source[0] >= 'A' && source[0] <= 'Z'))
 
-	symbol_value := read_until(source, " \t\n()[]{}<>,.:'\"/")
+	symbol_value := read_until(source, " \t\n()[]{}<>:'\"/\\")
 	symbol_length := len(symbol_value)
 	tokenizer.position += symbol_length
 	tokenizer.column += symbol_length
