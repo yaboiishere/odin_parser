@@ -67,7 +67,7 @@ GetError :: union {
 
 FailedToWriteAllBytes :: struct {}
 
-get :: proc(url: string) -> (response: string, error: GetError) {
+http_get :: proc(url: string) -> (response: string, error: GetError) {
 	url := parse_url(url) or_return
 
 	url_builer := strings.builder_make()
@@ -101,6 +101,8 @@ get :: proc(url: string) -> (response: string, error: GetError) {
 
 		strings.write_bytes(&response_builder, response_buffer[:])
 	}
+
+	net.close(socket)
 
 	return strings.to_string(response_builder), nil
 }

@@ -1,0 +1,3 @@
+[submodule "dependencies/cli"]
+	path = dependencies/cli
+	url = git@github.com:GoNZooo/odin-cli.git

@@ -11,7 +11,7 @@ Command :: union {
 	ParseFile,
 	ParseUrl,
 	DNSLookup,
-	Get,
+	HttpGet,
 }
 
 ParseFile :: struct {
@@ -26,7 +26,7 @@ DNSLookup :: struct {
 	hostname: string `cli:"h,hostname/required"`,
 }
 
-Get :: struct {
+HttpGet :: struct {
 	url: string `cli:"u,url/required"`,
 }
 
@@ -73,8 +73,8 @@ main :: proc() {
 
 		fmt.println("ipv4: ", ipv4)
 
-	case Get:
-		resp, err := get(c.url)
+	case HttpGet:
+		resp, err := http_get(c.url)
 		if err != nil {
 			fmt.println("Failed to get url: ", err)
 			os.exit(1)
