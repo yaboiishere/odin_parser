@@ -12,6 +12,7 @@ Command :: union {
 	ParseUrl,
 	DNSLookup,
 	HttpGet,
+	ParseHtml,
 }
 
 ParseFile :: struct {
@@ -29,6 +30,10 @@ DNSLookup :: struct {
 HttpGet :: struct {
 	url:  string `cli:"u,url/required"`,
 	file: string `cli:"f,file/optional"`,
+}
+
+ParseHtml :: struct {
+	file: string `cli:"f,file/required"`,
 }
 
 main :: proc() {
@@ -82,5 +87,10 @@ main :: proc() {
 		}
 
 		fmt.println("resp: ", resp)
+
+	case ParseHtml:
+		parse_html_file(c.file)
 	}
+
+
 }
