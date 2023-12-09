@@ -65,10 +65,15 @@ GetError :: union {
 	FailedToWriteAllBytes,
 	FailedToWriteFile,
 	ParseHttpError,
+	HttpError,
 }
 
 FailedToWriteAllBytes :: struct {}
 FailedToWriteFile :: struct {}
+HttpError :: struct {
+	status: int,
+	body:   string,
+}
 
 http_get :: proc(url: string, file: string) -> (response: string, error: GetError) {
 	url := parse_url(url) or_return
@@ -109,16 +114,20 @@ http_get :: proc(url: string, file: string) -> (response: string, error: GetErro
 
 	response = strings.to_string(response_builder)
 
-	parse_http(response) or_return
+	status, body := parse_http(response) or_return
+
+	if status >= 300 || status < 200 {
+		return "", HttpError{status = status, body = body}
+	}
 
 	if file != "" {
 		// write_file(file, response) or_return
-		if !os.write_entire_file(file, transmute([]u8)response) {
+		if !os.write_entire_file(file, transmute([]u8)body) {
 			return "", FailedToWriteFile{}
 		}
 	}
 
-	return response, nil
+	return body, nil
 }
 
 build_get :: proc(ipv4_string: string, path: string) -> string {
@@ -157,9 +166,9 @@ parse_http :: proc(http: string) -> (status: int, body: string, error: ParseHttp
 
 	tokenizer_expect(&tokenizer, EOF{}) or_return
 
-	parse_headers(&tokenizer) or_return
+	_, bytes := parse_headers(&tokenizer) or_return
 
-	body = parse_body(&tokenizer) or_return
+	body = tokenizer.source[bytes:]
 
 	return status, body, nil
 }
@@ -178,6 +187,7 @@ parse_headers :: proc(
 	tokenizer: ^Tokenizer,
 ) -> (
 	headers: [dynamic]Header,
+	bytes: int,
 	error: ParseHeadersError,
 ) {
 	for {
@@ -206,15 +216,9 @@ parse_headers :: proc(
 		append(&headers, header)
 	}
 
-	fmt.printf("headers: %v\n", headers)
+	tokenizer_expect(tokenizer, EOF{}) or_return
 
-	return headers, nil
-}
-
-parse_body :: proc(tokenizer: ^Tokenizer) -> (body: string, error: ParseHttpError) {
-	fmt.printf("parse_body\n")
-
-	return body, nil
+	return headers, tokenizer.position, nil
 }
 // WriteError :: union {
 // 	os.Errno,
