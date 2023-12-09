@@ -1,6 +1,5 @@
 package parser
 
-import "core:fmt"
 import "core:log"
 import "core:reflect"
 import "core:strconv"
@@ -21,6 +20,7 @@ Token :: union {
 	Quote,
 	Slash,
 	Colon,
+	Whitespace,
 }
 
 Text :: struct {
@@ -46,6 +46,9 @@ EOF :: struct {}
 Slash :: struct {}
 
 Colon :: struct {}
+
+Whitespace :: struct {}
+
 
 /*
 A mutable structure that keeps track of and allows operations for looking at,
@@ -384,6 +387,25 @@ current :: proc(tokenizer: ^Tokenizer, modify: bool) -> (token: Token) {
 		tokenizer_copy.column += 1
 
 		return Colon{}
+	case ' ':
+		tokenizer_copy.position += 1
+		tokenizer_copy.column += 1
+
+		return Whitespace{}
+	case '\r':
+		if tokenizer_copy.source[tokenizer_copy.position + 1] == '\n' {
+			tokenizer_copy.position += 2
+			tokenizer_copy.line += 1
+			tokenizer_copy.column = 0
+
+			return EOF{}
+		} else {
+			log.panicf(
+				"Unexpected carriage return without newline at %v:%v",
+				tokenizer_copy.line,
+				tokenizer_copy.column,
+			)
+		}
 	case '0' ..= '9':
 		return read_integer(&tokenizer_copy)
 	case '"':

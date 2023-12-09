@@ -1,8 +1,8 @@
 package parser
 
 import "core:fmt"
-// import "core:log"
 import "core:net"
+import "core:os"
 import "core:strings"
 
 ResolveError :: union {
@@ -63,11 +63,14 @@ GetError :: union {
 	ParseUrlError,
 	ResolveError,
 	FailedToWriteAllBytes,
+	FailedToWriteFile,
+	ParseHttpError,
 }
 
 FailedToWriteAllBytes :: struct {}
+FailedToWriteFile :: struct {}
 
-http_get :: proc(url: string) -> (response: string, error: GetError) {
+http_get :: proc(url: string, file: string) -> (response: string, error: GetError) {
 	url := parse_url(url) or_return
 
 	url_builer := strings.builder_make()
@@ -99,12 +102,23 @@ http_get :: proc(url: string) -> (response: string, error: GetError) {
 			break
 		}
 
-		strings.write_bytes(&response_builder, response_buffer[:])
+		strings.write_bytes(&response_builder, response_buffer[:bytes_read])
 	}
 
 	net.close(socket)
 
-	return strings.to_string(response_builder), nil
+	response = strings.to_string(response_builder)
+
+	parse_http(response) or_return
+
+	if file != "" {
+		// write_file(file, response) or_return
+		if !os.write_entire_file(file, transmute([]u8)response) {
+			return "", FailedToWriteFile{}
+		}
+	}
+
+	return response, nil
 }
 
 build_get :: proc(ipv4_string: string, path: string) -> string {
@@ -119,3 +133,119 @@ build_get :: proc(ipv4_string: string, path: string) -> string {
 
 	return strings.to_string(builder)
 }
+
+ParseHttpError :: union {
+	Maybe(ExpectedToken),
+	ParseHeadersError,
+}
+
+parse_http :: proc(http: string) -> (status: int, body: string, error: ParseHttpError) {
+	tokenizer := tokenizer_create(http, "http")
+	tokenizer_expect_exact(&tokenizer, Text{value = "HTTP"}) or_return
+	tokenizer_expect(&tokenizer, Slash{}) or_return
+	tokenizer_expect(&tokenizer, IntConst{}) or_return
+	tokenizer_expect(&tokenizer, Period{}) or_return
+	tokenizer_expect(&tokenizer, IntConst{}) or_return
+	tokenizer_skip_any_of(&tokenizer, {Whitespace{}})
+
+	statusToken := tokenizer_expect(&tokenizer, IntConst{}) or_return
+	status = statusToken.token.(IntConst).value
+
+	tokenizer_skip_any_of(&tokenizer, {Whitespace{}})
+
+	tokenizer_expect(&tokenizer, Text{}) or_return
+
+	tokenizer_expect(&tokenizer, EOF{}) or_return
+
+	parse_headers(&tokenizer) or_return
+
+	body = parse_body(&tokenizer) or_return
+
+	return status, body, nil
+}
+
+Header :: struct {
+	name:  string,
+	value: string,
+}
+
+ParseHeadersError :: union {
+	Maybe(ExpectedToken),
+	Maybe(ExpectedEndMarker),
+}
+
+parse_headers :: proc(
+	tokenizer: ^Tokenizer,
+) -> (
+	headers: [dynamic]Header,
+	error: ParseHeadersError,
+) {
+	for {
+		token := tokenizer_peek(tokenizer)
+
+		_, is_eof := token.(EOF)
+
+		if is_eof {
+			break
+		}
+
+		nameToken := tokenizer_expect(tokenizer, Text{}) or_return
+
+		tokenizer_expect(tokenizer, Colon{}) or_return
+		tokenizer_skip_any_of(tokenizer, {Whitespace{}})
+		value := tokenizer_read_string_until(tokenizer, []string{"\r\n"}) or_return
+
+		tokenizer_expect(tokenizer, EOF{}) or_return
+
+
+		header := Header {
+			name  = nameToken.token.(Text).value,
+			value = value,
+		}
+
+		append(&headers, header)
+	}
+
+	fmt.printf("headers: %v\n", headers)
+
+	return headers, nil
+}
+
+parse_body :: proc(tokenizer: ^Tokenizer) -> (body: string, error: ParseHttpError) {
+	fmt.printf("parse_body\n")
+
+	return body, nil
+}
+// WriteError :: union {
+// 	os.Errno,
+// 	FailedToWriteAllBytes,
+// }
+//
+// write_file :: proc(file: string, contents: string) -> (error: WriteError) {
+// 	file_handle, open_error := os.open(
+// 		file,
+// 		os.O_WRONLY | os.O_CREATE,
+// 		os.S_IRUSR | os.S_IWUSR | os.S_IRGRP | os.S_IROTH,
+// 	)
+//
+// 	if open_error != os.ERROR_NONE {
+// 		return open_error
+// 	}
+//
+// 	contents_len := len(contents)
+// 	write: []u8 = transmute([]u8)contents[:contents_len]
+//
+// 	bytes_written, write_error := os.write(file_handle, write)
+//
+// 	if write_error != os.ERROR_NONE {
+// 		return write_error
+// 	}
+//
+// 	if bytes_written != contents_len {
+// 		return FailedToWriteAllBytes{}
+// 	}
+//
+// 	fmt.printf("Wrote %d bytes to %s\n", bytes_written, file)
+//
+// 	return nil
+// }

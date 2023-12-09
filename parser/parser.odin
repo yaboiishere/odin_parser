@@ -27,7 +27,8 @@ DNSLookup :: struct {
 }
 
 HttpGet :: struct {
-	url: string `cli:"u,url/required"`,
+	url:  string `cli:"u,url/required"`,
+	file: string `cli:"f,file/optional"`,
 }
 
 main :: proc() {
@@ -74,7 +75,7 @@ main :: proc() {
 		fmt.println("ipv4: ", ipv4)
 
 	case HttpGet:
-		resp, err := http_get(c.url)
+		resp, err := http_get(c.url, c.file)
 		if err != nil {
 			fmt.println("Failed to get url: ", err)
 			os.exit(1)
