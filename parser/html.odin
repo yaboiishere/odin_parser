@@ -84,14 +84,10 @@ parse_tag :: proc(raw_tag: string) -> (tag: [dynamic]HtmlTag, error: HtmlParseEr
 		tokenizer_skip_any_of(&tokenizer, {EOF{}, Whitespace{}, TagEnd{}})
 		next_token := tokenizer_peek(&tokenizer)
 
-		// tag_or_text := tokenizer_expect_one_of(&tokenizer, {Tag{}, Text{}}) or_return
 		_, is_text := next_token.(Text)
 
 		if is_text {
-			string_value, string_value_error := tokenizer_read_string_until(
-				&tokenizer,
-				{"<", "\n"},
-			)
+			string_value, string_value_error := tokenizer_read_string_until(&tokenizer, {"<"})
 			if string_value_error == nil {
 				append(&children, string_value)
 				continue
@@ -104,7 +100,13 @@ parse_tag :: proc(raw_tag: string) -> (tag: [dynamic]HtmlTag, error: HtmlParseEr
 		_, is_close_tag := next_token.(CloseTag)
 
 		if is_close_tag {
-			break
+			tokenizer_expect(&tokenizer, CloseTag{}) or_return
+			next := tokenizer_peek(&tokenizer)
+			_, is_eof := next.(EOF)
+			if is_eof {
+				break
+			}
+			continue
 		}
 
 		should_be_tag := tokenizer_expect(&tokenizer, Tag{}) or_return

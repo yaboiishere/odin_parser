@@ -559,6 +559,8 @@ read_tag :: proc(tokenizer: ^Tokenizer) -> (token: Token) {
 
 	if source[1] == '/' {
 		tag_name := read_until(source[2:], ">")
+		tokenizer.position += len(tag_name) + 3
+		tokenizer.column += len(tag_name) + 3
 		return CloseTag{value = tag_name}
 	}
 
