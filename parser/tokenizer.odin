@@ -21,7 +21,13 @@ Token :: union {
 	Slash,
 	Colon,
 	Whitespace,
+	Tag,
+	TagEnd,
+	CloseTag,
+	Equals,
+	Attribute,
 }
+
 
 Text :: struct {
 	value: string,
@@ -48,6 +54,30 @@ Slash :: struct {}
 Colon :: struct {}
 
 Whitespace :: struct {}
+
+Equals :: struct {}
+
+Tag :: struct {
+	value:     string,
+	attribute: Attribute,
+	inside:    string,
+}
+
+TagEnd :: struct {}
+
+CloseTag :: struct {
+	value: string,
+}
+
+Attribute :: struct {
+	name:  string,
+	value: AttributeValue,
+}
+
+AttributeValue :: union {
+	string,
+	Url,
+}
 /*
 A mutable structure that keeps track of and allows operations for looking at,
 consuming and expecting tokens. Created with `tokenizer_create`.
@@ -390,6 +420,11 @@ current :: proc(tokenizer: ^Tokenizer, modify: bool) -> (token: Token) {
 		tokenizer_copy.column += 1
 
 		return Whitespace{}
+	case '\t':
+		tokenizer_copy.position += 1
+		tokenizer_copy.column += 4
+
+		return Whitespace{}
 	case '\r':
 		if tokenizer_copy.source[tokenizer_copy.position + 1] == '\n' {
 			tokenizer_copy.position += 2
@@ -404,6 +439,21 @@ current :: proc(tokenizer: ^Tokenizer, modify: bool) -> (token: Token) {
 				tokenizer_copy.column,
 			)
 		}
+
+	case '=':
+		tokenizer_copy.position += 1
+		tokenizer_copy.column += 1
+
+		return Equals{}
+
+	case '<':
+		return read_tag(&tokenizer_copy)
+	case '>':
+		tokenizer_copy.position += 1
+		tokenizer_copy.column += 1
+
+		return TagEnd{}
+
 	case '0' ..= '9':
 		return read_integer(&tokenizer_copy)
 	case '"':
@@ -499,4 +549,94 @@ read_string :: proc(tokenizer: ^Tokenizer, quote_characters: string) -> (token: 
 	}
 
 	return QuotedString{value = string_contents}
+}
+
+read_tag :: proc(tokenizer: ^Tokenizer) -> (token: Token) {
+	start := tokenizer.position
+	source := tokenizer.source[start:]
+
+	assert(source[0] == '<')
+
+	if source[1] == '/' {
+		tag_name := read_until(source[2:], ">")
+		return CloseTag{value = tag_name}
+	}
+
+	tag_name := read_until(source[1:], " \t\n>")
+	tag_attribute: Attribute
+
+	tokenizer.position += len(tag_name) + 1
+	tokenizer.column += len(tag_name) + 1
+
+	if tokenizer.source[tokenizer.position] == ' ' {
+		tokenizer.position += 1
+		tokenizer.column += 1
+		tag_attribute = read_tag_args(tokenizer)
+	}
+
+	string_builder := strings.builder_make()
+	strings.write_string(&string_builder, "</")
+	strings.write_string(&string_builder, tag_name)
+	strings.write_string(&string_builder, ">")
+	end_tag := strings.to_string(string_builder)
+
+	inside, inside_error := tokenizer_read_string_until(tokenizer, {end_tag})
+
+	if inside_error != nil {
+		log.panicf("Failed to find end of tag: %v", inside_error)
+	}
+
+	return Tag{value = tag_name, attribute = tag_attribute, inside = inside}
+}
+
+read_tag_args :: proc(tokenizer: ^Tokenizer) -> Attribute {
+	attributes := [dynamic]Attribute{}
+	for {
+		attribute, attribute_error := tokenizer_expect_one_of(tokenizer, {Text{}, TagEnd{}})
+
+		_, is_tag_end := attribute.token.(TagEnd)
+
+		if is_tag_end {
+			break
+		}
+
+		if attribute_error != nil {
+			log.panicf("Failed to parse attribute: %v", attribute_error)
+		}
+
+		tokenizer_skip_any_of(tokenizer, {Whitespace{}})
+		current_token, current_token_error := tokenizer_expect(tokenizer, Equals{})
+
+		if current_token_error != nil {
+			log.panicf("Failed to parse attribute: %v", current_token_error)
+		}
+
+		_, is_equals := current_token.token.(Equals)
+		tokenizer_skip_any_of(tokenizer, {Whitespace{}})
+		if !is_equals {
+			continue
+		}
+
+		value, value_error := tokenizer_read_string_until(tokenizer, {">"})
+		resp_attribute := Attribute {
+			name  = attribute.token.(Text).value,
+			value = value,
+		}
+
+		if value_error != nil {
+			log.panicf("Failed to parse attribute: %v", attribute_error)
+		}
+
+		url, url_error := parse_url(value)
+		if url_error == nil {
+			resp_attribute = Attribute {
+				name  = attribute.token.(Text).value,
+				value = url,
+			}
+		}
+
+		append(&attributes, resp_attribute)
+	}
+
+	return attributes[0]
 }

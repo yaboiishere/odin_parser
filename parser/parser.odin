@@ -89,7 +89,14 @@ main :: proc() {
 		fmt.println("resp: ", resp)
 
 	case ParseHtml:
-		parse_html_file(c.file)
+		resp, html_error := parse_html_file(c.file)
+
+		if html_error != nil {
+			fmt.println("Failed to parse html: ", html_error)
+			os.exit(1)
+		}
+
+		fmt.println("resp: ", resp)
 	}
 
 
