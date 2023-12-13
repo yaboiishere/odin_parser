@@ -134,3 +134,9 @@ flip_terms :: proc(docs_to_terms: DocumentToTerms) -> (terms_to_docs: TermsToDoc
 
 	return terms_to_docs
 }
+
+save_to_binary_tree :: proc(root: ^Node, terms_to_docs: TermsToDocuments) {
+	for term, _ in terms_to_docs {
+		binary_tree_insert(root, term)
+	}
+}

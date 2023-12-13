@@ -144,5 +144,13 @@ exercise :: proc(url: string) {
 	flipped := flip_terms(cleaned_terms)
 
 	fmt.println("flipped: ", flipped)
+
+	btree := Node{}
+	save_to_binary_tree(&btree, flipped)
+
+	fmt.println("btree: ")
+
+	binary_tree_print(&btree)
+
 	os.remove(filename)
 }
