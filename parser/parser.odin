@@ -129,5 +129,20 @@ exercise :: proc(url: string) {
 			fmt.println("href: ", child.(A).href)
 		}
 	}
+
+	texts := get_all_texts_from_html(parsed)
+	fmt.println("texts: ", texts)
+
+	terms := get_terms(texts)
+
+	fmt.println("terms: ", terms)
+
+	cleaned_terms := clean_terms(terms)
+
+	fmt.println("cleaned_terms: ", cleaned_terms)
+
+	flipped := flip_terms(cleaned_terms)
+
+	fmt.println("flipped: ", flipped)
 	os.remove(filename)
 }
