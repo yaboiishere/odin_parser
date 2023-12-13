@@ -1,5 +1,6 @@
 package parser
 
+import "core:fmt"
 import "core:os"
 
 HtmlParseError :: union {
@@ -45,6 +46,8 @@ parse_html_file :: proc(file: string) -> (html: Html, error: HtmlParseError) {
 
 	html = parse_html(&tokenizer) or_return
 
+
+	fmt.println(html)
 	return html, nil
 }
 

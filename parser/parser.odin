@@ -13,6 +13,7 @@ Command :: union {
 	DNSLookup,
 	HttpGet,
 	ParseHtml,
+	Exercise,
 }
 
 ParseFile :: struct {
@@ -34,6 +35,10 @@ HttpGet :: struct {
 
 ParseHtml :: struct {
 	file: string `cli:"f,file/required"`,
+}
+
+Exercise :: struct {
+	url: string `cli:"u,url/required"`,
 }
 
 main :: proc() {
@@ -97,7 +102,32 @@ main :: proc() {
 		}
 
 		fmt.println("resp: ", resp)
+
+	case Exercise:
+		exercise(c.url)
+	}
+}
+
+exercise :: proc(url: string) {
+
+	filename := "html.tmp"
+	_, err := http_get(url, filename)
+	if err != nil {
+		fmt.println("Failed to get url: ", err)
+		os.exit(1)
 	}
 
+	parsed, parse_error := parse_html_file(filename)
+	if parse_error != nil {
+		fmt.println("Failed to parse html: ", parse_error)
+		os.exit(1)
+	}
 
+	for child in parsed.body.children {
+		_, is_a := child.(A)
+		if is_a {
+			fmt.println("href: ", child.(A).href)
+		}
+	}
+	os.remove(filename)
 }
