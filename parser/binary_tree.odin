@@ -8,17 +8,35 @@ Node :: struct {
 }
 
 binary_tree_insert :: proc(node: ^Node, value: string) {
-	if node == nil || node.value == "" {
-		fmt.println("init ", value)
+
+	if node.value == "" || node.value == value || node == nil {
 		node.value = value
 		return
 	}
-	fmt.println("insert ", value)
 	if value < node.value {
-		binary_tree_insert(node.left_child, value)
+		if node.left_child == nil {
+			left_child := Node {
+				value = value,
+			}
+			node.left_child = new_clone(left_child)
+		} else {
+			binary_tree_insert(node.left_child, value)
+		}
+		return
 	} else {
-		binary_tree_insert(node.right_child, value)
+		if node.right_child == nil {
+			right_child := Node {
+				value = value,
+			}
+			node.right_child = new_clone(right_child)
+		} else {
+			binary_tree_insert(node.right_child, value)
+		}
+		return
 	}
+
+	fmt.panicf("should not reach here", value)
+
 
 }
 
@@ -39,11 +57,11 @@ binary_tree_search :: proc(node: ^Node, value: string) -> bool {
 }
 
 binary_tree_print :: proc(node: ^Node) {
-	if node == nil {
+	if node == nil || node.value == "" {
 		return
 	}
 
 	binary_tree_print(node.left_child)
-	fmt.println(node.value)
+	fmt.print(" ", node.value)
 	binary_tree_print(node.right_child)
 }
